@@ -4,6 +4,7 @@
     pip install PyQt6
     python3 pyqt/signalsim_layouts.py                 # open the layout picker window
     python3 pyqt/signalsim_layouts.py --shots         # write screenshots/pyqt-*.png
+    python3 pyqt/signalsim_layouts.py --shots --layout map   # one layout in every theme
 
 Layouts
     dashboard  - sidebar navigation + KPI cards + sky plot + C/N0 chart   (Midnight Indigo)
@@ -910,7 +911,10 @@ def main():
     themes = load_themes()
     if "--shots" in sys.argv:
         os.makedirs(SHOTS, exist_ok=True)
-        for key, (_title, _fn, theme_id) in LAYOUTS.items():
+        only = arg("--layout")
+        jobs = ([(only, t) for t in themes] if only else
+                [(k, v[2]) for k, v in LAYOUTS.items()])
+        for key, theme_id in jobs:
             apply_theme(app, themes[theme_id])
             w = Main(themes, key, theme_id)
             w.show()
