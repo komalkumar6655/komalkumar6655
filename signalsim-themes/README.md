@@ -2,7 +2,7 @@
 
 ## PyQt6 layouts (`pyqt/signalsim_layouts.py`)
 
-Four different GUI designs for the GNSS signal simulator, each shown with a modern theme:
+Eight different GUI designs for the GNSS signal simulator, each shown with a modern theme:
 
 | Layout | Theme | Screenshot |
 |---|---|---|
@@ -10,6 +10,10 @@ Four different GUI designs for the GNSS signal simulator, each shown with a mode
 | Mission control: sky, spectrum + waterfall, channel table, event log | Radar | `screenshots/pyqt-mission-radar.png` |
 | Setup wizard: 5 steps, constellation cards, band summary | Paper Light | `screenshots/pyqt-wizard-paper.png` |
 | Trajectory map: route with floating control cards | Nord Frost | `screenshots/pyqt-map-nord.png` |
+| Studio (IDE style): explorer tree, C/N0 timeline, spectrum, inspector | Carbon | `screenshots/pyqt-studio-carbon.png` |
+| Compact panel: narrow window, speed gauge, signal chips | Glacier Light | `screenshots/pyqt-compact-glacier.png` |
+| Instrument panel: arc gauges + satellite cards | Amber Night | `screenshots/pyqt-instruments-amber.png` |
+| Scenario timeline: 24 h visibility bars, event keyframes, event editor | Midnight Indigo | `screenshots/pyqt-timeline-midnight.png` |
 
 ```bash
 pip install PyQt6
@@ -18,7 +22,7 @@ python3 pyqt/signalsim_layouts.py --layout wizard --theme amber
 python3 pyqt/signalsim_layouts.py --shots                     # regenerate screenshots
 ```
 
-Layouts: `dashboard`, `mission`, `wizard`, `map`. All data shown is demo data.
+Layouts: `dashboard`, `mission`, `wizard`, `map`, `studio`, `compact`, `instruments`, `timeline`. All data shown is demo data.
 
 ## Themes (`themes/`)
 

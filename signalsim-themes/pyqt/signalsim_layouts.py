@@ -881,19 +881,543 @@ def build_map(theme):
 
 
 # ====================================================================== app
+# ====================================================================== extra painted widgets
+class Gauge(ThemedPaint):
+    """Circular arc gauge (270°) with value text."""
+
+    def __init__(self, theme, value, lo, hi, text, label, tone="accent", ticks=None, parent=None):
+        super().__init__(theme, parent)
+        self.v, self.lo, self.hi, self.text, self.label, self.tone = value, lo, hi, text, label, tone
+        self.ticks = ticks or []
+        self.setMinimumSize(170, 170)
+
+    def paintEvent(self, _):
+        p = self.painter()
+        w, h = self.width(), self.height()
+        r = min(w, h) / 2 - 14
+        rect = QRectF(w / 2 - r, h / 2 - r, 2 * r, 2 * r)
+        pen = QPen(self.col("surface2"), 12, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        p.setPen(pen)
+        p.drawArc(rect, 225 * 16, -270 * 16)
+        frac = max(0.0, min(1.0, (self.v - self.lo) / (self.hi - self.lo)))
+        g = QPen(self.col(self.tone), 12, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        p.setPen(g)
+        p.drawArc(rect, 225 * 16, int(-270 * 16 * frac))
+        for t, key in self.ticks:            # threshold markers
+            a = math.radians(225 - 270 * (t - self.lo) / (self.hi - self.lo))
+            p.setPen(QPen(self.col(key), 3))
+            p.drawLine(QPointF(w / 2 + (r - 12) * math.cos(a), h / 2 - (r - 12) * math.sin(a)),
+                       QPointF(w / 2 + (r + 8) * math.cos(a), h / 2 - (r + 8) * math.sin(a)))
+        f = QFont(first_family(MONO_FONTS))
+        f.setPixelSize(int(r * 0.36))
+        f.setBold(True)
+        p.setFont(f)
+        p.setPen(self.col("text"))
+        p.drawText(QRectF(0, h / 2 - r * 0.32, w, r * 0.5), AF.AlignCenter, self.text)
+        f2 = QFont(first_family(UI_FONTS))
+        f2.setPixelSize(max(10, int(r * 0.13)))
+        f2.setBold(True)
+        p.setFont(f2)
+        p.setPen(self.col("textMuted"))
+        p.drawText(QRectF(0, h / 2 + r * 0.22, w, r * 0.3), AF.AlignCenter, self.label.upper())
+        p.end()
+
+
+class Cn0Timeline(ThemedPaint):
+    """C/N0 of a few satellites over the run, with a playhead."""
+
+    def __init__(self, theme, parent=None):
+        super().__init__(theme, parent)
+        self.setMinimumHeight(220)
+
+    def paintEvent(self, _):
+        p = self.painter()
+        w, h = self.width(), self.height()
+        left, bottom = 34, 20
+        ph, pw = h - bottom - 8, w - left - 8
+        lo, hi = 30, 52
+        f = QFont(first_family(MONO_FONTS))
+        f.setPixelSize(9)
+        p.setFont(f)
+        for v in (30, 35, 40, 45, 50):
+            y = 8 + ph * (1 - (v - lo) / (hi - lo))
+            p.setPen(QPen(self.col("border"), 1, Qt.PenStyle.DotLine))
+            p.drawLine(QPointF(left, y), QPointF(w - 8, y))
+            p.setPen(self.col("textFaint"))
+            p.drawText(QRectF(0, y - 7, left - 6, 14), AF.AlignRight | AF.AlignVCenter, str(v))
+        for m in range(0, 11, 2):
+            x = left + pw * m / 10
+            p.drawText(QRectF(min(x - 20, w - 44), h - 16, 40, 14), AF.AlignCenter, f"{m:02d}:00")
+        sc = sys_colors(self.c)
+        rng = random.Random(9)
+        for s in SATS[::3]:
+            base = s["cn0"]
+            path = QPainterPath()
+            for i in range(121):
+                t = i / 120
+                v = base + 1.6 * math.sin(t * 6 + base) + rng.gauss(0, 0.35)
+                if s["prn"] == SATS[6]["prn"] and 0.55 < t < 0.63:
+                    v -= 14          # simulated outage (e.g. tunnel)
+                pt = QPointF(left + pw * t, 8 + ph * (1 - (v - lo) / (hi - lo)))
+                path.moveTo(pt) if i == 0 else path.lineTo(pt)
+            col = QColor(sc[s["sys"]])
+            col.setAlpha(210)
+            p.setPen(QPen(col, 1.6))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawPath(path)
+        x = left + pw * 0.42
+        p.setPen(QPen(self.col("warn"), 2))
+        p.drawLine(QPointF(x, 4), QPointF(x, 8 + ph))
+        p.setBrush(self.col("warn"))
+        p.drawEllipse(QPointF(x, 6), 4, 4)
+        p.end()
+
+
+class VisibilityTimeline(ThemedPaint):
+    """Per-satellite visibility bars over 24 h, event markers and a playhead."""
+
+    def __init__(self, theme, parent=None):
+        super().__init__(theme, parent)
+        self.setMinimumHeight(420)
+
+    def paintEvent(self, _):
+        p = self.painter()
+        w, h = self.width(), self.height()
+        left, top = 70, 28
+        rows = SATS[:18]
+        rh = (h - top - 10) / len(rows)
+        pw = w - left - 10
+        f = QFont(first_family(MONO_FONTS))
+        f.setPixelSize(10)
+        p.setFont(f)
+        for hr in range(0, 25, 3):
+            x = left + pw * hr / 24
+            p.setPen(QPen(self.col("border"), 1, Qt.PenStyle.DotLine))
+            p.drawLine(QPointF(x, top - 4), QPointF(x, h - 10))
+            p.setPen(self.col("textFaint"))
+            p.drawText(QRectF(min(x - 22, w - 46), 4, 44, 16), AF.AlignCenter, f"{hr:02d}:00")
+        sc = sys_colors(self.c)
+        rng = random.Random(21)
+        for i, s in enumerate(rows):
+            y = top + i * rh
+            if i % 2 == 0:
+                p.fillRect(QRectF(0, y, w, rh), self.col("surface2", 90))
+            p.setPen(self.col("textMuted"))
+            p.drawText(QRectF(8, y, left - 14, rh), AF.AlignLeft | AF.AlignVCenter, s["prn"])
+            col = QColor(sc[s["sys"]])
+            start = rng.uniform(-4, 10)
+            while start < 24:
+                dur = rng.uniform(3.5, 7)
+                a, b = max(start, 0), min(start + dur, 24)
+                if b > a:
+                    rect = QRectF(left + pw * a / 24, y + rh * 0.22, pw * (b - a) / 24, rh * 0.56)
+                    g = QLinearGradient(rect.topLeft(), rect.topRight())
+                    c1, c2 = QColor(col), QColor(col)
+                    c1.setAlpha(90)
+                    c2.setAlpha(230)
+                    g.setColorAt(0, c1)
+                    g.setColorAt(0.5, c2)
+                    g.setColorAt(1, c1)
+                    p.setPen(Qt.PenStyle.NoPen)
+                    p.setBrush(QBrush(g))
+                    p.drawRoundedRect(rect, rh * 0.28, rh * 0.28)
+                start += dur + rng.uniform(4, 8)
+        # playhead
+        x = left + pw * 12.07 / 24
+        p.setPen(QPen(self.col("accent"), 2))
+        p.drawLine(QPointF(x, top - 6), QPointF(x, h - 10))
+        p.setBrush(self.col("accent"))
+        p.setPen(Qt.PenStyle.NoPen)
+        tri = QPainterPath(QPointF(x - 7, top - 12))
+        tri.lineTo(x + 7, top - 12)
+        tri.lineTo(x, top - 3)
+        tri.closeSubpath()
+        p.drawPath(tri)
+        p.end()
+
+
+class EventLane(ThemedPaint):
+    """Keyframe lane for scenario events."""
+    EVENTS = [(0.0, "Start", "ok"), (3.5, "C/N0 −6 dB", "warn"), (7.2, "E12 outage", "err"),
+              (12.07, "now", "accent"), (16.0, "Route leg 2", "info"), (21.5, "Stop", "textMuted")]
+
+    def __init__(self, theme, parent=None):
+        super().__init__(theme, parent)
+        self.setFixedHeight(64)
+
+    def paintEvent(self, _):
+        p = self.painter()
+        w, h = self.width(), self.height()
+        left, pw = 70, w - 80
+        p.setPen(QPen(self.col("borderStrong"), 2))
+        p.drawLine(QPointF(left, h / 2), QPointF(w - 10, h / 2))
+        f = QFont(first_family(UI_FONTS))
+        f.setPixelSize(11)
+        f.setBold(True)
+        p.setFont(f)
+        p.setPen(self.col("textMuted"))
+        p.drawText(QRectF(8, 0, left - 10, h), AF.AlignLeft | AF.AlignVCenter, "EVENTS")
+        for t, name, key in self.EVENTS:
+            if name == "now":
+                continue
+            x = left + pw * t / 24
+            d = QPainterPath(QPointF(x, h / 2 - 8))
+            d.lineTo(x + 8, h / 2)
+            d.lineTo(x, h / 2 + 8)
+            d.lineTo(x - 8, h / 2)
+            d.closeSubpath()
+            p.setPen(QPen(self.col("bg"), 2))
+            p.setBrush(self.col(key))
+            p.drawPath(d)
+            p.setPen(self.col("text"))
+            p.drawText(QRectF(x - 60, 2, 120, 16), AF.AlignCenter, name)
+        p.end()
+
+
+# ====================================================================== layout 5: studio (IDE style)
+def build_studio(theme):
+    from PyQt6.QtWidgets import QTabWidget, QTreeWidget, QTreeWidgetItem
+    c = theme["colors"]
+    win = QWidget()
+    win.setObjectName("central")
+    root = QVBoxLayout(win)
+    root.setContentsMargins(0, 0, 0, 0)
+    root.setSpacing(0)
+
+    tb = QFrame()
+    tb.setObjectName("headerBar")
+    th = QHBoxLayout(tb)
+    th.setContentsMargins(14, 8, 14, 8)
+    th.setSpacing(8)
+    th.addWidget(lab("🛰  SignalSim Studio", "h2"))
+    th.addSpacing(18)
+    for t in ("📂 Open", "💾 Save", "⤓ Ephemeris"):
+        b = QPushButton(t)
+        b.setObjectName("ghost")
+        th.addWidget(b)
+    th.addStretch(1)
+    th.addWidget(lab("munich_route.json — modified", "faint"))
+    th.addSpacing(12)
+    go = QPushButton("▶  Run")
+    go.setObjectName("primary")
+    th.addWidget(go)
+    st = QPushButton("■  STOP RF")
+    st.setObjectName("estopButton")
+    th.addWidget(st)
+    root.addWidget(tb)
+
+    body = QHBoxLayout()
+    body.setContentsMargins(10, 10, 10, 10)
+    body.setSpacing(10)
+    root.addLayout(body, 1)
+
+    # explorer
+    ex, exv = card(margins=10, spacing=6)
+    ex.setFixedWidth(250)
+    exv.addWidget(lab("EXPLORER", "tileLabel"))
+    tree = QTreeWidget()
+    tree.setHeaderHidden(True)
+    tree.setIndentation(14)
+    for top, kids in (("Scenarios", ["munich_static.json", "munich_route.json ●", "e5a_b2a_test.json", "l1_only.json"]),
+                      ("Ephemeris", ["BRDC00WRD_S_2026305", "BRD400DLR_S_2026305", "BRDC00IGS_R_2021170"]),
+                      ("Routes", ["ostbahnhof.kml", "airport_loop.kml"]),
+                      ("Devices", ["B206mini · 3271A9F", "Simulated SDR"])):
+        it = QTreeWidgetItem([top])
+        for k in kids:
+            it.addChild(QTreeWidgetItem([k]))
+        tree.addTopLevelItem(it)
+        it.setExpanded(top != "Routes")
+    tree.setCurrentItem(tree.topLevelItem(0).child(1))
+    exv.addWidget(tree, 1)
+    body.addWidget(ex)
+
+    # center
+    center = QVBoxLayout()
+    center.setSpacing(10)
+    tabs = QTabWidget()
+    tl = QWidget()
+    tlv = QVBoxLayout(tl)
+    tlv.setContentsMargins(4, 12, 4, 4)
+    tlv.addLayout(hbox(lab("C/N0 over time", "h2"), None, lab("playhead 04:12", "chip", tone="warn")))
+    tlv.addWidget(Cn0Timeline(theme), 1)
+    tlv.addLayout(legend(theme))
+    tabs.addTab(tl, "Timeline")
+    tabs.addTab(QWidget(), "Spectrum")
+    tabs.addTab(QWidget(), "Sky")
+    tabs.addTab(QWidget(), "Log")
+    tc, tcv = card(margins=12)
+    tcv.addWidget(tabs)
+    center.addWidget(tc, 3)
+    lower = QHBoxLayout()
+    lower.setSpacing(10)
+    sp, spv = card(margins=12)
+    spv.addWidget(lab("Spectrum", "h2"))
+    spv.addWidget(Spectrum(theme), 1)
+    lower.addWidget(sp, 3)
+    kp, kpv = card(margins=14, spacing=6)
+    for k, v, tone in (("GEN SPEED", "1.42×", "ok"), ("BUFFER", "64 %", "warn"), ("GAPS", "0", "ok")):
+        kpv.addWidget(lab(k, "tileLabel"))
+        kpv.addWidget(lab(v, "bigValue", tone=tone))
+    lower.addWidget(kp, 1)
+    center.addLayout(lower, 2)
+    body.addLayout(center, 1)
+
+    # inspector
+    ins, iv = card(margins=14, spacing=8)
+    ins.setFixedWidth(300)
+    iv.addWidget(lab("INSPECTOR", "tileLabel"))
+    for section, rows in (("Receiver", [("Mode", "Trajectory"), ("Speed", "36.0 km/h"), ("Altitude", "520.0 m")]),
+                          ("Simulation", [("Start", "2026-11-01 12:00"), ("C/N0", "45.0 dB-Hz"), ("Mask", "5°")]),
+                          ("Band", [("Centre", "1568.26 MHz"), ("Rate", "19.35 MS/s"), ("Signals", "L1CA · E1 · B1I")]),
+                          ("Output", [("Device", "B206mini"), ("Port", "TX/RX"), ("Gain", "0 dB")])):
+        iv.addWidget(lab(f"▾  {section}", "h2"))
+        g = QFormLayout()
+        g.setVerticalSpacing(4)
+        for k, v in rows:
+            g.addRow(lab(k, "muted"), lab(v, "mono"))
+        iv.addLayout(g)
+    iv.addWidget(check("Test only (no RF)", True))
+    iv.addStretch(1)
+    body.addWidget(ins)
+
+    sb = QFrame()
+    sb.setObjectName("headerBar")
+    sbl = QHBoxLayout(sb)
+    sbl.setContentsMargins(14, 5, 14, 5)
+    sbl.addWidget(lab(f"<span style='color:{c['ok']}'>●</span> running · Simulated SDR", "faint"))
+    sbl.addStretch(1)
+    sbl.addWidget(lab("4 threads · CPU 63 % · 1568.26 MHz · 19.35 MS/s · UTC 12:04:12", "faint"))
+    root.addWidget(sb)
+    return win
+
+
+# ====================================================================== layout 6: compact panel
+def build_compact(theme):
+    win = QWidget()
+    win.setObjectName("central")
+    v = QVBoxLayout(win)
+    v.setContentsMargins(20, 18, 20, 18)
+    v.setSpacing(14)
+    v.addLayout(hbox(lab("🛰  SignalSim", "brand"), None, lab("● B206mini", "chip", tone="ok")))
+
+    g = Gauge(theme, 1.42, 0, 2, "1.42×", "generator speed", "accent", ticks=[(1.05, "warn")])
+    g.setMinimumSize(250, 250)
+    v.addWidget(g)
+    row = QHBoxLayout()
+    for k, val, tone in (("SATS", "23", "info"), ("GAPS", "0", "ok"), ("TIME", "04:12", "")):
+        cc, cv = card(margins=10, spacing=0)
+        cv.addWidget(lab(k, "tileLabel"), 0, AF.AlignHCenter)
+        bv = lab(val, "bigValue", tone=tone)
+        cv.addWidget(bv, 0, AF.AlignHCenter)
+        row.addWidget(cc)
+    v.addLayout(row)
+
+    seg = QHBoxLayout()
+    seg.setSpacing(0)
+    grp = QButtonGroup(win)
+    for i, t in enumerate(("Static", "Trajectory", "File")):
+        b = QPushButton(t)
+        b.setObjectName("navButton")
+        b.setCheckable(True)
+        b.setChecked(i == 0)
+        grp.addButton(b)
+        seg.addWidget(b)
+    sc, sv = card(margins=6, spacing=0)
+    sv.addLayout(seg)
+    v.addWidget(sc)
+
+    f = QFormLayout()
+    f.setVerticalSpacing(8)
+    f.addRow("Position", QLineEdit("48.137154, 11.576124"))
+    f.addRow("Altitude", dspin(520.0, 1, " m"))
+    f.addRow("Duration", dspin(600, 0, " s"))
+    v.addLayout(f)
+
+    v.addWidget(lab("SIGNALS", "tileLabel"))
+    chips = QGridLayout()
+    chips.setSpacing(6)
+    for i, (t, on) in enumerate((("L1CA", 1), ("E1", 1), ("B1I", 1), ("G1", 0), ("L5", 0), ("E5a", 0), ("B2a", 0), ("L1C", 0))):
+        chips.addWidget(lab(("✓ " if on else "") + t, "chip", tone="accent" if on else ""), i // 4, i % 4)
+    v.addLayout(chips)
+    v.addWidget(lab("1568.26 MHz · 19.35 MS/s · auto", "mono"))
+    v.addWidget(check("Test only (no RF output)", True))
+    v.addStretch(1)
+    go = QPushButton("▶  Start simulation")
+    go.setObjectName("startButton")
+    v.addWidget(go)
+    st = QPushButton("■  STOP RF")
+    st.setObjectName("estopButton")
+    v.addWidget(st)
+    return win
+
+
+# ====================================================================== layout 7: instrument panel
+def build_instruments(theme):
+    c = theme["colors"]
+    win = QWidget()
+    win.setObjectName("central")
+    root = QHBoxLayout(win)
+    root.setContentsMargins(18, 16, 18, 16)
+    root.setSpacing(16)
+
+    main = QVBoxLayout()
+    main.setSpacing(14)
+    main.addLayout(hbox(lab("Instrument panel", "h1"), None, lab("UTC 12:04:12", "chip"),
+                        lab("RF: TEST ONLY", "chip", tone="warn")))
+    gauges = QHBoxLayout()
+    gauges.setSpacing(14)
+    for val, lo, hi, txt, label, tone, ticks in ((1.42, 0, 2, "1.42×", "gen speed", "ok", [(1.05, "warn")]),
+                                                 (64, 0, 100, "64%", "buffer", "warn", [(50, "ok"), (90, "ok")]),
+                                                 (43.1, 30, 52, "43.1", "avg C/N0", "info", [(45, "accent")]),
+                                                 (0, 0, 89, "0 dB", "tx gain", "accent", []),
+                                                 (63, 0, 100, "63%", "cpu", "accent", [])):
+        gc, gv = card(margins=8)
+        gv.addWidget(Gauge(theme, val, lo, hi, txt, label, tone, ticks))
+        gauges.addWidget(gc)
+    main.addLayout(gauges)
+
+    main.addLayout(hbox(lab("Satellites in view", "h2"), None, legend(theme)))
+    grid = QGridLayout()
+    grid.setSpacing(10)
+    sc = sys_colors(c)
+    for i, s in enumerate(sorted(SATS, key=lambda s: -s["cn0"])):
+        cc, cv = card(margins=10, spacing=3)
+        col = sc[s["sys"]].name()
+        cv.addLayout(hbox(lab(f"<span style='color:{col}'>●</span> <b>{s['prn']}</b>"), None,
+                          lab(f"{s['cn0']:.1f}", "mono")))
+        pb = QProgressBar()
+        pb.setRange(30, 52)
+        pb.setValue(int(s["cn0"]))
+        pb.setTextVisible(False)
+        pb.setFixedHeight(6)
+        pb.setStyleSheet(f"QProgressBar::chunk {{ background: {col}; border-radius: 3px; }}")
+        cv.addWidget(pb)
+        cv.addWidget(lab(f"az {s['az']:.0f}° · el {s['el']:.0f}°", "faint"))
+        grid.addWidget(cc, i // 5, i % 5)
+    main.addLayout(grid)
+    main.addStretch(1)
+    root.addLayout(main, 1)
+
+    side, sv = card(margins=16, spacing=10)
+    side.setFixedWidth(270)
+    sv.addWidget(lab("CONTROL", "tileLabel"))
+    sv.addWidget(lab("Scenario", "muted"))
+    cb = QComboBox()
+    cb.addItems(["munich_static.json", "munich_route.json"])
+    sv.addWidget(cb)
+    sv.addWidget(lab("Device", "muted"))
+    dv = QComboBox()
+    dv.addItems(["B206mini · 3271A9F", "Simulated SDR"])
+    sv.addWidget(dv)
+    sv.addWidget(lab("TX gain", "muted"))
+    sl = QSlider(Qt.Orientation.Horizontal)
+    sl.setRange(0, 89)
+    sv.addWidget(sl)
+    sv.addWidget(check("Test only (no RF)", True))
+    sv.addWidget(check("Shielded setup confirmed", False))
+    sv.addStretch(1)
+    pb = QProgressBar()
+    pb.setValue(42)
+    pb.setFormat("04:12 / 10:00")
+    sv.addWidget(pb)
+    go = QPushButton("▶  Start")
+    go.setObjectName("startButton")
+    sv.addWidget(go)
+    st = QPushButton("■  STOP RF")
+    st.setObjectName("estopButton")
+    sv.addWidget(st)
+    root.addWidget(side)
+    return win
+
+
+# ====================================================================== layout 8: timeline editor
+def build_timeline(theme):
+    win = QWidget()
+    win.setObjectName("central")
+    root = QVBoxLayout(win)
+    root.setContentsMargins(16, 14, 16, 14)
+    root.setSpacing(12)
+
+    bar = QHBoxLayout()
+    bar.setSpacing(8)
+    bar.addWidget(lab("Scenario timeline", "h1"))
+    bar.addSpacing(20)
+    for t in ("⏮", "◀◀", "▶", "▶▶", "⏭"):
+        b = QPushButton(t)
+        b.setObjectName("primary" if t == "▶" else "ghost")
+        b.setFixedWidth(52)
+        bar.addWidget(b)
+    bar.addSpacing(12)
+    bar.addWidget(lab("12:04:12 UTC", "bigValue"))
+    bar.addStretch(1)
+    zoom = QComboBox()
+    zoom.addItems(["24 h", "6 h", "1 h", "10 min"])
+    bar.addWidget(lab("Zoom", "muted"))
+    bar.addWidget(zoom)
+    st = QPushButton("■  STOP RF")
+    st.setObjectName("estopButton")
+    bar.addWidget(st)
+    root.addLayout(bar)
+
+    body = QHBoxLayout()
+    body.setSpacing(12)
+    left = QVBoxLayout()
+    left.setSpacing(10)
+    tc, tv = card(margins=10, spacing=6)
+    tv.addLayout(hbox(lab("Satellite visibility", "h2"), None, legend(theme)))
+    tv.addWidget(VisibilityTimeline(theme), 1)
+    tv.addWidget(EventLane(theme))
+    left.addWidget(tc, 1)
+    body.addLayout(left, 1)
+
+    side, sv = card(margins=16, spacing=8)
+    side.setFixedWidth(300)
+    sv.addWidget(lab("SELECTED EVENT", "tileLabel"))
+    sv.addWidget(lab("◆  E12 outage", "h2"))
+    f = QFormLayout()
+    f.setVerticalSpacing(8)
+    ty = QComboBox()
+    ty.addItems(["Signal outage", "C/N0 step", "Route leg", "Start / stop"])
+    f.addRow("Type", ty)
+    f.addRow("Satellite", QLineEdit("E12"))
+    f.addRow("At", QLineEdit("07:12:00"))
+    f.addRow("Duration", dspin(45, 0, " s"))
+    f.addRow("Level", dspin(-14.0, 1, " dB"))
+    sv.addLayout(f)
+    sv.addWidget(check("Ramp in / out", True))
+    sv.addLayout(hbox(QPushButton("Duplicate"), QPushButton("Delete"), None))
+    sv.addSpacing(10)
+    sv.addWidget(lab("RUN", "tileLabel"))
+    for k, v, tone in (("Gen speed", "1.42×", "ok"), ("Gaps", "0", "ok")):
+        sv.addLayout(hbox(lab(k, "muted"), None, lab(v, "bigValue", tone=tone)))
+    sv.addStretch(1)
+    sv.addWidget(check("Test only (no RF)", True))
+    go = QPushButton("▶  Run scenario")
+    go.setObjectName("startButton")
+    sv.addWidget(go)
+    body.addWidget(side)
+    root.addLayout(body, 1)
+    return win
+
+
 LAYOUTS = {
     "dashboard": ("Sidebar dashboard", build_dashboard, "midnight"),
     "mission": ("Mission control", build_mission, "radar"),
     "wizard": ("Setup wizard", build_wizard, "paper"),
     "map": ("Trajectory map", build_map, "nord"),
+    "studio": ("Studio (IDE style)", build_studio, "carbon"),
+    "compact": ("Compact panel", build_compact, "glacier"),
+    "instruments": ("Instrument panel", build_instruments, "amber"),
+    "timeline": ("Scenario timeline", build_timeline, "midnight"),
 }
+SIZES = {"compact": (480, 900)}
 
 
 class Main(QMainWindow):
     def __init__(self, themes, layout, theme_id):
         super().__init__()
         self.setWindowTitle(f"SignalSim · {LAYOUTS[layout][0]}")
-        self.resize(1360, 860)
+        self.resize(*SIZES.get(layout, (1360, 860)))
         self.setCentralWidget(LAYOUTS[layout][1](themes[theme_id]))
 
 
