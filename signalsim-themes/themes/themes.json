@@ -1,0 +1,104 @@
+{
+  "_comment": "SignalSim GUI themes. Every key below 'colors' is substituted into signalsim.qss as {{key}}. status colours: ok = themeHex(0), err = themeHex(1), warn = themeHex(2), info = themeHex(3).",
+  "default": "carbon",
+  "themes": [
+    {
+      "id": "carbon",
+      "name": "Carbon",
+      "description": "Neutral graphite dark with a cyan signal accent. Calm default for long sessions.",
+      "dark": true,
+      "colors": {
+        "bg": "#0F1115", "header": "#12151B", "surface": "#171A21", "surface2": "#1E222B",
+        "border": "#2A2F3A", "borderStrong": "#3A4150",
+        "text": "#E6E8EE", "textMuted": "#9AA3B2", "textFaint": "#6B7383",
+        "accent": "#22D3EE", "accentHover": "#67E8F9", "accentText": "#062229", "accentSoft": "#12343D",
+        "ok": "#34D399", "warn": "#FBBF24", "err": "#F87171", "info": "#60A5FA",
+        "danger": "#E5484D", "dangerHover": "#F2555A", "dangerText": "#FFFFFF"
+      }
+    },
+    {
+      "id": "midnight",
+      "name": "Midnight Indigo",
+      "description": "Deep navy with indigo/violet accents. Modern 'dashboard' look.",
+      "dark": true,
+      "colors": {
+        "bg": "#0B1020", "header": "#0E1527", "surface": "#121A2E", "surface2": "#18223A",
+        "border": "#24304D", "borderStrong": "#33426A",
+        "text": "#E7EAF6", "textMuted": "#A0A9C6", "textFaint": "#6E7899",
+        "accent": "#818CF8", "accentHover": "#A5B4FC", "accentText": "#0B1020", "accentSoft": "#262E5C",
+        "ok": "#4ADE80", "warn": "#FACC15", "err": "#FB7185", "info": "#38BDF8",
+        "danger": "#E11D48", "dangerHover": "#F43F5E", "dangerText": "#FFFFFF"
+      }
+    },
+    {
+      "id": "nord",
+      "name": "Nord Frost",
+      "description": "Arctic blue-grey with frost accents (Nord palette). Low contrast, easy on the eyes.",
+      "dark": true,
+      "colors": {
+        "bg": "#2E3440", "header": "#2A2F3A", "surface": "#3B4252", "surface2": "#434C5E",
+        "border": "#4C566A", "borderStrong": "#5E6A82",
+        "text": "#ECEFF4", "textMuted": "#B8C1D1", "textFaint": "#8690A3",
+        "accent": "#88C0D0", "accentHover": "#8FBCBB", "accentText": "#242933", "accentSoft": "#3F5566",
+        "ok": "#A3BE8C", "warn": "#EBCB8B", "err": "#E0737D", "info": "#81A1C1",
+        "danger": "#BF616A", "dangerHover": "#D06B74", "dangerText": "#FFFFFF"
+      }
+    },
+    {
+      "id": "radar",
+      "name": "Radar",
+      "description": "Black with phosphor-green, like a scope or radar console. Fits an RF lab.",
+      "dark": true,
+      "colors": {
+        "bg": "#050A07", "header": "#07100A", "surface": "#0B140E", "surface2": "#0F1C14",
+        "border": "#173323", "borderStrong": "#22513A",
+        "text": "#C8F7D8", "textMuted": "#7FBF97", "textFaint": "#4C7D5F",
+        "accent": "#3BE38A", "accentHover": "#6CF0A6", "accentText": "#03140A", "accentSoft": "#0F3A24",
+        "ok": "#3BE38A", "warn": "#F5C542", "err": "#FF5A5A", "info": "#4FD1FF",
+        "danger": "#E5484D", "dangerHover": "#F2555A", "dangerText": "#FFFFFF"
+      }
+    },
+    {
+      "id": "amber",
+      "name": "Amber Night",
+      "description": "Warm amber on brown-black. Low blue light for night work in a dark lab.",
+      "dark": true,
+      "colors": {
+        "bg": "#120D08", "header": "#160F09", "surface": "#1B140D", "surface2": "#231A11",
+        "border": "#3A2B1C", "borderStrong": "#554029",
+        "text": "#FFE8C7", "textMuted": "#D1B48A", "textFaint": "#8F7558",
+        "accent": "#FFB347", "accentHover": "#FFC977", "accentText": "#1B1206", "accentSoft": "#4A3317",
+        "ok": "#B5E07A", "warn": "#FFB347", "err": "#FF6B5A", "info": "#F2C879",
+        "danger": "#E5484D", "dangerHover": "#F2555A", "dangerText": "#FFFFFF"
+      }
+    },
+    {
+      "id": "paper",
+      "name": "Paper Light",
+      "description": "Clean white cards on soft grey with a blue accent. Bright rooms and printouts.",
+      "dark": false,
+      "colors": {
+        "bg": "#F3F4F7", "header": "#FFFFFF", "surface": "#FFFFFF", "surface2": "#F8F9FB",
+        "border": "#DDE1E8", "borderStrong": "#C4CAD4",
+        "text": "#151922", "textMuted": "#5B6474", "textFaint": "#8A93A3",
+        "accent": "#2563EB", "accentHover": "#1D4ED8", "accentText": "#FFFFFF", "accentSoft": "#DBE7FE",
+        "ok": "#15803D", "warn": "#B45309", "err": "#DC2626", "info": "#2563EB",
+        "danger": "#DC2626", "dangerHover": "#B91C1C", "dangerText": "#FFFFFF"
+      }
+    },
+    {
+      "id": "glacier",
+      "name": "Glacier Light",
+      "description": "Light mint/teal. Fresh, soft light theme with a teal accent.",
+      "dark": false,
+      "colors": {
+        "bg": "#EAF3F2", "header": "#F8FCFB", "surface": "#FFFFFF", "surface2": "#F5FAF9",
+        "border": "#D0E2DF", "borderStrong": "#B2CBC7",
+        "text": "#0F2423", "textMuted": "#4E6966", "textFaint": "#85A09C",
+        "accent": "#0D9488", "accentHover": "#0F766E", "accentText": "#FFFFFF", "accentSoft": "#CCF0EA",
+        "ok": "#15803D", "warn": "#B45309", "err": "#DC2626", "info": "#0369A1",
+        "danger": "#DC2626", "dangerHover": "#B91C1C", "dangerText": "#FFFFFF"
+      }
+    }
+  ]
+}
